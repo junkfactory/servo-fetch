@@ -300,6 +300,12 @@ mod tests {
                 sysexits::SOFTWARE,
             ),
             (
+                Error::new(FetchError::WorkerUnavailable {
+                    source: Box::new(io::Error::other("worker exited")),
+                }),
+                sysexits::SOFTWARE,
+            ),
+            (
                 Error::new(FetchError::Io(io::Error::other("disk failed"))),
                 sysexits::IOERR,
             ),

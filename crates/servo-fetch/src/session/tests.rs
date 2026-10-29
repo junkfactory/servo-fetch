@@ -493,6 +493,29 @@ fn assert_fetch_protocol_failure(responses: &str) {
 
 #[cfg(unix)]
 #[test]
+fn worker_death_mid_fetch_is_reported_as_unavailable() {
+    let script = format!(
+        "{}read_frame; {}read_frame; exec true",
+        scripted_worker_prefix(),
+        initialized_shell(1)
+    );
+    let broker = scripted_broker(&script, [], 0);
+    let mut session = broker.session_blocking(BrowserSessionConfig::new()).unwrap();
+    let config_dir = session.supervisor.as_ref().unwrap().config_dir.clone();
+    let options = FetchOptions::new("https://example.com").timeout(Duration::from_secs(5));
+
+    // Regression: a worker that dies while a fetch is in flight must fail as
+    // WorkerUnavailable (exit 70 at the CLI), not wait for the operation timeout.
+    assert!(matches!(
+        session.fetch_blocking(&options),
+        Err(Error::WorkerUnavailable { .. })
+    ));
+    assert!(!config_dir.exists());
+    assert!(session.fetch_blocking(&options).is_err());
+}
+
+#[cfg(unix)]
+#[test]
 fn protocol_info_validation_fails_closed() {
     let invalid_infos = [
         WorkerProtocolInfo {
