@@ -208,7 +208,7 @@ fn computed_style_hidden_content_is_stripped() {
 
 #[test]
 #[ignore = "e2e: requires Servo engine"]
-fn csp_sandbox_pipeline_crash_fails_fast() {
+fn csp_sandbox_page_fetches_without_crashing() {
     block_on(async {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
@@ -226,7 +226,6 @@ fn csp_sandbox_pipeline_crash_fails_fast() {
 
         let dir = tempfile::tempdir().expect("tempdir");
         let jar = dir.path().join("cookies.txt");
-        let started = Instant::now();
         let output = servo_fetch()
             .args([
                 "--allow-private-addresses",
@@ -238,16 +237,12 @@ fn csp_sandbox_pipeline_crash_fails_fast() {
             ])
             .output()
             .expect("run servo-fetch");
-        let elapsed = started.elapsed();
         let stderr = from_utf8(&output.stderr).expect("stderr is UTF-8");
         let stdout = from_utf8(&output.stdout).expect("stdout is UTF-8");
 
-        assert_eq!(output.status.code(), Some(70), "stdout: {stdout}; stderr: {stderr}");
-        assert!(
-            elapsed < Duration::from_secs(10),
-            "elapsed: {elapsed:?}; stdout: {stdout}; stderr: {stderr}"
-        );
-        assert!(stderr.contains("page crashed"), "stdout: {stdout}; stderr: {stderr}");
+        // Regression: servo/servo#48394 (konippi/servo-fetch#412) - CSP sandbox pages must not crash the worker.
+        assert!(output.status.success(), "stdout: {stdout}; stderr: {stderr}");
+        assert!(stdout.contains("Sandboxed"), "stdout: {stdout}; stderr: {stderr}");
         assert!(!stderr.contains("timed out"), "stderr: {stderr}");
     });
 }
